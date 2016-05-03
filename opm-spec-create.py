@@ -148,6 +148,8 @@ cp -rp * %%{buildroot}/%%{_datadir}/openstack-puppet/modules/%s/
     out.write(files_cmds)
     out.write('%changelog\n\n')
     out.close()
+    print "The spec file is available at: %s.spec" % (os.path.join(out_path,
+                                                                   prj_name))
 
 
 if __name__ == '__main__':
@@ -174,6 +176,7 @@ if __name__ == '__main__':
                     git('clone', upstream_url, project)
                 with cdir(pdir):
                     if os.path.isfile('metadata.json'):
+                        print "Attempt to generate spec file for %s" % project
                         generate_spec_file(wdir, project, pkg)
             except Exception, e:
                 print "[FAILED] Clone from %s (%s)" % (upstream_url, e)
