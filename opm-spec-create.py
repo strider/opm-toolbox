@@ -71,13 +71,17 @@ def generate_package_name(modname):
 
 
 def get_download_url(url):
+    dl_url = ""
     upstream_url = parse.urlsplit(url)
     path = upstream_url.path.split(".git")[0]
-    dl_url = ("https",
-              upstream_url.netloc,
-              "%s/archive/%%{version}.tar.gz" % path,
-              "", "", "")
-    dl_url = parse.urlunparse(dl_url)
+    if '/openstack/' in path:
+        dl_url = "https://tarballs.openstack.org/%{name}/%{name}-%{version}.tar.gz"
+    else:
+        dl_url = ("https",
+                upstream_url.netloc,
+                "%s/archive/%%{version}.tar.gz" % path,
+                "", "", "")
+        dl_url = parse.urlunparse(dl_url)
     return dl_url
 
 
@@ -88,7 +92,6 @@ def generate_spec_file(out_path, prj_name, info_pm):
                             '%s.spec'
                             % prj_name), 'w')
 
-    # FIXME
     download_url = get_download_url(info_pm['upstream'])
 
     if is_from_puppetlabs(info_pm['upstream']):
