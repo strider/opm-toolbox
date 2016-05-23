@@ -110,7 +110,7 @@ def generate_spec_file(out_path, prj_name, info_pm):
 
     out.write('Requires:\t\tpuppet >= 2.7.0\n')
     out.write('\n')
-    out.write('%%description\n%s\n\n' % metadata['summary'])
+    out.write('%%description\n%s\n\n' % metadata['description'])
     out.write('%prep\n')
     if puppetlabs_name is not None:
         out.write('%setup -q -n %{upstream_name}-%{upstream_version}\n')
@@ -174,9 +174,10 @@ if __name__ == '__main__':
             try:
                 with cdir(wdir):
                     git('clone', upstream_url, project)
-                with cdir(pdir):
-                    if os.path.isfile('metadata.json'):
-                        print "Attempt to generate spec file for %s" % project
-                        generate_spec_file(wdir, project, pkg)
             except Exception, e:
                 print "[FAILED] Clone from %s (%s)" % (upstream_url, e)
+
+            with cdir(pdir):
+                if os.path.isfile('metadata.json'):
+                    print "Attempt to generate spec file for %s" % project
+                    generate_spec_file(wdir, project, pkg)
