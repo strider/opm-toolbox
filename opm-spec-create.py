@@ -19,7 +19,10 @@ import sys
 import imp
 import shutil
 import json
+import jinja2
 import tempfile
+
+from jinja2 import Environment, FileSystemLoader
 
 from six.moves.urllib import parse
 
@@ -48,6 +51,25 @@ def load_metadata_file(filename):
     with open(filename, 'r') as f:
         return json.load(f)
 
+def load_template_dir(template_dir):
+    return jinja2.FileSystemLoader(os.getcwd() + '/' + template_dir)
+
+def scrub_metadata(metadata,pkg):
+    if 'description' not in metadata:
+        metadata['description'] = 'FIXME: NONE FOUND'
+    metadata['name'] = generate_package_name(metadata['name'])
+    for dep in metadata['dependencies']:
+        dep['name'] = generate_package_name(dep['name'])
+    metadata['source0'] = get_download_url(pkg['upstream'])
+    metadata['project'] = transform_mod_name(pkg['project'])
+    metadata['from_puppetlabs'] = is_from_puppetlabs(pkg['upstream'])
+    if is_from_puppetlabs(pkg['upstream']):
+        metadata['project_name'] = pkg['project'].replace('puppet-', 'puppetlabs-', 1)
+        metadata['upstream_name'] = 'upstream_name'
+    else:
+        metadata['upstream_name'] = 'name'
+
+    return metadata
 
 def transform_mod_name(modname):
     if '-' in modname:
@@ -85,79 +107,28 @@ def get_download_url(url):
     return dl_url
 
 
-def generate_spec_file(out_path, prj_name, info_pm):
-    puppetlabs_name = None
-    metadata = load_metadata_file('metadata.json')
-    out = open(os.path.join(out_path,
-                            '%s.spec'
-                            % prj_name), 'w')
-
-    download_url = get_download_url(info_pm['upstream'])
-
-    if is_from_puppetlabs(info_pm['upstream']):
-        puppetlabs_name = prj_name.replace('puppet-', 'puppetlabs-', 1)
-        out.write('%%define upstream_name %s\n\n' % puppetlabs_name)
-
-    out.write('Name:\t\t\t%s\n' % prj_name)
-    out.write('Version:\t\tXXX\n')
-    out.write('Release:\t\tXXX\n')
-    out.write('Summary:\t\t%s\n' % metadata['summary'])
-    out.write('License:\t\t%s\n\n' % metadata['license'])
-    out.write('URL:\t\t\t%s\n\n' % metadata['project_page'])
-    out.write('Source0:\t\t%s\n\n' % download_url)
-    out.write('BuildArch:\t\tnoarch\n\n')
-
-    for dep in metadata['dependencies']:
-        out.write('Requires:\t\t%s\n'
-                  % generate_package_name(dep['name']))
-
-    out.write('Requires:\t\tpuppet >= 2.7.0\n')
-    out.write('\n')
-    out.write('%%description\n%s\n\n' % metadata['description'])
-    out.write('%prep\n')
-    if puppetlabs_name is not None:
-        out.write('%setup -q -n %{upstream_name}-%{upstream_version}\n')
-    else:
-        out.write('%setup -q -n %{name}-%{version}\n')
-    cleanup_cmds = """
-find . -type f -name ".*" -exec rm {} +
-find . -size 0 -exec rm {} +
-find . \( -name "*.pl" -o -name "*.sh"  \) -exec chmod +x {} +
-find . \( -name "*.pp" -o -name "*.py"  \) -exec chmod -x {} +
-find . \( -name "*.rb" -o -name "*.erb" \) -exec chmod -x {} +
-find . \( -name spec -o -name ext \) | xargs rm -rf\n
-"""
-    out.write(cleanup_cmds)
-
-    out.write('%build\n\n')
-    install_cmds = """
-%%install
-rm -rf %%{buildroot}
-install -d -m 0755 %%{buildroot}/%%{_datadir}/openstack-puppet/modules/%s/
-cp -rp * %%{buildroot}/%%{_datadir}/openstack-puppet/modules/%s/
-""" % (transform_mod_name(prj_name), transform_mod_name(prj_name))
-
-    out.write(install_cmds)
-    if "nova" in generate_package_name(metadata['name']):
-        out.write("rm -f %{buildroot}/%{_datadir}/openstack-puppet/modules/nova/files/nova-novncproxy.init\n")
-    else:
-        out.write("\n\n")
-
-    files_cmds = """
-%%files
-%%{_datadir}/openstack-puppet/modules/%s/\n\n
-""" % transform_mod_name(prj_name)
-
-    out.write(files_cmds)
-    out.write('%changelog\n\n')
-    out.close()
+def generate_spec_file(out_path, pkg, template):
+    project = pkg['project']
+    metadata = scrub_metadata(load_metadata_file('metadata.json'), pkg)
+    out = os.path.join(out_path,
+                       '%s.spec'
+                       % project)
+    rend_out = template.render(metadata=metadata)
+    print_spec(rend_out, out)
     print "The spec file is available at: %s.spec" % (os.path.join(out_path,
-                                                                   prj_name))
+                                                                   project))
 
+def print_spec(spec, out):
+    out = open(out, 'w')
+    out.write(spec)
+    out.close()
 
 if __name__ == '__main__':
     rdoinfo = fetch_rdoinfo(RDOINFO)
     wdir = tempfile.mkdtemp()
+    loader= load_template_dir('templates')
+    env = Environment(loader=loader)
+    template = env.get_template('puppet.spec')
 
     if len(sys.argv) == 2:
         rdoinfo['packages'] = [r for r in rdoinfo['packages'] if
@@ -183,4 +154,4 @@ if __name__ == '__main__':
             with cdir(pdir):
                 if os.path.isfile('metadata.json'):
                     print "Attempt to generate spec file for %s" % project
-                    generate_spec_file(wdir, project, pkg)
+                    generate_spec_file(wdir, pkg, template)
