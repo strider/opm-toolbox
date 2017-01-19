@@ -23,7 +23,11 @@ Requires:               puppet >= 2.7.0
 {{ metadata.description }}
 
 %prep
+{% if 'openstack.org' in metadata.source0 -%}
+%setup -q -n openstack-{{ metadata.project }}-%{upstream_version}
+{% else -%}
 %setup -q -n {{ '%{'+metadata.upstream_name+'}-%{upstream_version}' }}
+{%- endif %}
 
 find . -type f -name ".*" -exec rm {} +
 find . -size 0 -exec rm {} +
