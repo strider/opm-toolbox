@@ -62,6 +62,10 @@ def scrub_metadata(metadata,pkg):
         dep['name'] = generate_package_name(dep['name'])
     metadata['source0'] = get_download_url(pkg['upstream'])
     metadata['project'] = transform_mod_name(pkg['project'])
+
+    if metadata['license'] == 'Apache-2.0':
+        metadata['license'] = 'ASL 2.0'
+
     metadata['from_puppetlabs'] = is_from_puppetlabs(pkg['upstream'])
     if is_from_puppetlabs(pkg['upstream']):
         metadata['project_name'] = pkg['project'].replace('puppet-', 'puppetlabs-', 1)
