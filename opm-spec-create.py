@@ -44,7 +44,8 @@ def fetch_rdoinfo(rdoinfo_repo):
     file, path, desc = imp.find_module('rdoinfo', [rm.repo_path])
     rdoinfo = imp.load_module('rdoinfo', file, path, desc)
     return rdoinfo.parse_info_file(os.path.join(userdir,
-                                                'rdoinfo/rdo.yml'))
+                                                'rdoinfo/rdo.yml'),
+                                                include_fns=[])
 
 
 def load_metadata_file(filename):
